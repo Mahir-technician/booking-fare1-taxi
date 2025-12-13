@@ -8,13 +8,12 @@ const prisma = new PrismaClient();
 export async function GET() {
   try {
     
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as any;
 
     if (!session || !session.user?.email) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
@@ -23,10 +22,9 @@ export async function GET() {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    
     const orders = await prisma.order.findMany({
       where: { userId: user.id },
-      orderBy: { id: 'desc' }, 
+      orderBy: { id: 'desc' },
     });
 
     return NextResponse.json(orders);

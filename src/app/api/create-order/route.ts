@@ -8,20 +8,18 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as any;
 
     if (!session || !session.user?.email) {
       return NextResponse.json({ message: "Unauthorized: Please login first" }, { status: 401 });
     }
 
-    
     const body = await req.json();
     const { 
       pickup, dropoff, vehicle, price, date, time, 
       flight, meet, pax, bags, stops 
     } = body;
 
-    
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
@@ -30,14 +28,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    
     const newOrder = await prisma.order.create({
       data: {
         userId: user.id,
         pickup,
         dropoff,
         vehicle,
-        price: parseFloat(price), 
+        price: parseFloat(price),
         date,
         time,
         flight: flight || null,
@@ -46,7 +43,7 @@ export async function POST(req: Request) {
         bags: parseInt(bags),
         stops: stops || [],
         status: "pending",
-        paymentId: "pay_in_cab", 
+        paymentId: "pay_in_cab",
       },
     });
 
