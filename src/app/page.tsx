@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-// import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"; // Uncomment for production
-// import toast, { Toaster } from 'react-hot-toast'; // Uncomment for production
-// import { useSession } from 'next-auth/react'; // Uncomment for production
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import toast, { Toaster } from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // --- TypeScript Definitions ---
 type LngLat = [number, number];
@@ -52,59 +54,9 @@ const vehicles = [
 
 const MAX_STOPS = 3;
 
-// --- MOCK COMPONENTS & HOOKS (For Preview Compatibility) ---
-const PayPalScriptProvider = ({ children }: any) => <>{children}</>;
-const PayPalButtons = ({ style, createOrder, onApprove }: any) => (
-  <div className="w-full mb-4">
-      <button 
-        onClick={() => {
-             onApprove({}, { 
-                order: { 
-                    capture: async () => {
-                        console.log("PayPal Payment Captured"); 
-                        return { status: 'COMPLETED' };
-                    } 
-                } 
-            });
-        }}
-        className="w-full bg-[#FFC439] text-black font-bold py-3.5 rounded-xl hover:bg-[#F4B400] transition flex justify-center items-center gap-2 border border-[#FFC439]"
-      >
-        <span className="italic font-bold text-lg">Pay<span className="text-[#0079C1]">Pal</span></span> (Mock)
-      </button>
-  </div>
-);
-
-const ToastContainer = ({ message, type, onClose }: { message: string, type: 'success'|'error'|'', onClose: () => void }) => {
-    if (!message) return null;
-    return (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[100] transition-all duration-300 ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-            <span className="font-bold mr-2">{type === 'success' ? '✓' : '✕'}</span>
-            {message}
-        </div>
-    );
-};
-
-const useCustomSearchParams = () => {
-  const [params, setParams] = useState<URLSearchParams | null>(null);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setParams(new URLSearchParams(window.location.search));
-    }
-  }, []);
-  return params;
-};
-
 // --- Helper: Global Header Component ---
 const Header = () => {
-  // Mock Session check for preview. In production, use useSession()
-  const [session, setSession] = useState<any>(null);
-
-  useEffect(() => {
-      const isLogged = typeof window !== 'undefined' && localStorage.getItem('isLoggedIn');
-      if (isLogged) {
-          setSession({ user: { name: 'User', image: null } });
-      }
-  }, []);
+  const { data: session } = useSession();
 
   return (
       <header id="site-header" className="fixed z-50 w-full top-0">
@@ -138,6 +90,7 @@ const MainBookingForm = () => {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [sheetOverlayOpen, setSheetOverlayOpen] = useState(true);
   const [bottomBarVisible, setBottomBarVisible] = useState(false);
+  const router = useRouter();
   
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
@@ -248,6 +201,7 @@ const MainBookingForm = () => {
       const r = data.routes[0];
       const distMiles = r.distance / 1609.34;
       currentDistanceMiles.current = distMiles;
+      setDistanceDisplay(distMiles.toFixed(1) + ' mi');
       updatePrice();
       if (mapRef.current.getSource('route')) {
         mapRef.current.getSource('route').setData(r.geometry);
@@ -340,7 +294,7 @@ const MainBookingForm = () => {
 
   const goToBooking = () => {
     let url = `/?pickup=${encodeURIComponent(pickup)}&dropoff=${encodeURIComponent(dropoff)}&vehicle=${encodeURIComponent(vehicles[selectedVehicleIndex].name)}&price=${totalPrice.toFixed(2)}&date=${date}&time=${time}&flight=${flightNumber}&meet=${meetGreet}&pax=${pax}&bags=${bags}`;
-    window.location.href = url;
+    router.push(url);
   };
 
   return (
@@ -415,36 +369,23 @@ const MainBookingForm = () => {
 // 2. BOOKING SUMMARY COMPONENT (Popup & Payment)
 // ==========================================
 const BookingSummary = () => {
-  const params = useCustomSearchParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { data: session } = useSession();
   const [showPopup, setShowPopup] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{msg: string, type: 'success'|'error'|''} >({msg: '', type: ''});
-  const [session, setSession] = useState<any>(null);
 
-  useEffect(() => {
-      // Mock Auth Check - In production use next-auth
-      const isLogged = typeof window !== 'undefined' && localStorage.getItem('isLoggedIn');
-      if (isLogged) {
-          setSession({ user: { name: 'User', email: 'user@example.com' } });
-      }
-  }, []);
-
-  const showToast = (msg: string, type: 'success'|'error') => {
-      setToastMessage({msg, type});
-      setTimeout(() => setToastMessage({msg: '', type: ''}), 3000);
-  };
-
-  const pickup = params?.get('pickup') || '';
-  const dropoff = params?.get('dropoff') || '';
-  const vehicle = params?.get('vehicle') || '';
-  const price = params?.get('price') || '0';
-  const date = params?.get('date') || '';
-  const time = params?.get('time') || '';
-  const flight = params?.get('flight') || '';
-  const meet = params?.get('meet') === 'true';
-  const pax = params?.get('pax') || '1';
-  const bags = params?.get('bags') || '0';
+  const pickup = searchParams?.get('pickup') || '';
+  const dropoff = searchParams?.get('dropoff') || '';
+  const vehicle = searchParams?.get('vehicle') || '';
+  const price = searchParams?.get('price') || '0';
+  const date = searchParams?.get('date') || '';
+  const time = searchParams?.get('time') || '';
+  const flight = searchParams?.get('flight') || '';
+  const meet = searchParams?.get('meet') === 'true';
+  const pax = searchParams?.get('pax') || '1';
+  const bags = searchParams?.get('bags') || '0';
   
   const isComplete = pickup && dropoff && vehicle && price;
 
@@ -458,37 +399,67 @@ const BookingSummary = () => {
       });
 
       if (res.ok) {
-        showToast("Booking Successful! Redirecting...", 'success');
-        setTimeout(() => window.location.href = '/dashboard', 2000);
+        toast.success("Booking Successful! Redirecting...");
+        setTimeout(() => router.push('/dashboard'), 2000);
       } else {
-        showToast("Simulation: Booking Created", 'success');
+        toast.error("Failed to create booking.");
       }
     } catch (err) {
-      showToast("Something went wrong.", 'error');
+      toast.error("Something went wrong.");
     } finally {
       setIsBooking(false);
     }
   };
 
-  // Get current URL to use as redirect
-  const getCurrentUrl = () => {
-    if (typeof window !== 'undefined') {
-        return window.location.href;
+  const handleOnlinePayment = async () => {
+    setIsProcessingPayment(true);
+    try {
+      const res = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickup, dropoff, vehicle, price, date, time,
+          flight, meet, pax, bags, stops: [] 
+        }),
+      });
+
+      const orderData = await res.json();
+
+      if (res.ok && orderData.orderId) {
+        const payRes = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ price, bookingId: orderData.orderId }),
+        });
+
+        const payData = await payRes.json();
+
+        if (payData.url) {
+            window.location.href = payData.url;
+        } else {
+            toast.error("Payment initiation failed.");
+        }
+      } else {
+        toast.error("Failed to initiate booking.");
+      }
+    } catch (err) {
+      toast.error("Something went wrong with payment.");
+    } finally {
+      setIsProcessingPayment(false);
     }
-    return '/';
   };
 
-  const handleOnlinePayment = async () => {
-    // ... Payment logic ...
-    // Note: Usually requires creating order first, then passing ID to Stripe
-    showToast("Redirecting to Stripe...", 'success');
+  const handleLoginRedirect = () => {
+    // Current URL as the redirect destination
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '/';
+    router.push(`/log-in?redirect=${encodeURIComponent(currentUrl)}`);
   };
 
   if (!isComplete) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
         <h2 className="text-xl font-bold text-red-500 mb-2">Incomplete Booking Details</h2>
-        <a href="/" className="bg-brand-gold text-black font-bold py-2 px-6 rounded">Start New Booking</a>
+        <Link href="/" className="bg-brand-gold text-black font-bold py-2 px-6 rounded">Start New Booking</Link>
       </div>
     );
   }
@@ -496,7 +467,7 @@ const BookingSummary = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 font-sans">
       <Header />
-      <ToastContainer message={toastMessage.msg} type={toastMessage.type as any} onClose={() => setToastMessage({msg: '', type: ''})} />
+      <Toaster position="top-center" />
       <div className="max-w-2xl mx-auto bg-black border border-brand-gold/30 rounded-2xl p-6 shadow-2xl mt-16">
         <h1 className="text-2xl md:text-3xl font-bold text-brand-gold text-center mb-8 border-b border-gray-800 pb-4">BOOKING SUMMARY</h1>
         
@@ -515,14 +486,22 @@ const BookingSummary = () => {
         {/* PayPal Option: Only shown if logged in */}
         {session && (
             <div className="mb-4">
-                <PayPalScriptProvider options={{ clientId: "test", currency: "GBP" }}>
+                <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: "GBP" }}>
                     <PayPalButtons 
-                        createOrder={(data: any, actions: any) => { return Promise.resolve('mock_order_id'); }}
-                        onApprove={(data: any, actions: any) => { 
-                            showToast("PayPal Payment Successful", 'success'); 
-                            // Simulate redirect after payment
-                            setTimeout(() => window.location.href = '/dashboard', 2000);
-                            return Promise.resolve(); 
+                        style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
+                        createOrder={async (data: any, actions: any) => {
+                            return actions.order.create({
+                                intent: "CAPTURE",
+                                purchase_units: [{
+                                    amount: { currency_code: "GBP", value: price }
+                                }]
+                            });
+                        }}
+                        onApprove={async (data: any, actions: any) => {
+                           await actions.order.capture();
+                           toast.success("PayPal Payment Successful");
+                           // Here you would typically save the order as paid
+                           handleBookOrder();
                         }}
                     />
                 </PayPalScriptProvider>
@@ -531,16 +510,14 @@ const BookingSummary = () => {
 
         <div className="space-y-3">
           {session ? (
-             // If logged in, show "Pay in Cab" instead of triggering popup
              <button 
                onClick={handleBookOrder} 
-               disabled={isBooking}
+               disabled={isBooking || isProcessingPayment}
                className="w-full bg-gray-800 text-white font-bold py-4 rounded-xl text-lg transition-all border border-gray-600 hover:bg-gray-700"
              >
                {isBooking ? "Processing..." : "CONFIRM & PAY IN CAB"}
              </button>
           ) : (
-             // If guest, show "Proceed to Checkout" which triggers login popup
              <button onClick={() => setShowPopup(true)} className="w-full bg-brand-gold hover:bg-yellow-600 text-black font-black py-4 rounded-xl text-lg transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)]">PROCEED TO CHECKOUT</button>
           )}
           
@@ -558,8 +535,7 @@ const BookingSummary = () => {
               <p className="text-xs text-gray-400">Please login before making the payment</p>
             </div>
             
-            {/* Redirect logic added here: sends user back to current page after login */}
-            <a href={`/log-in?redirect=${encodeURIComponent(getCurrentUrl())}`} className="block w-full bg-white text-black font-bold text-center py-3.5 rounded-xl mb-6 hover:bg-gray-200 transition">Login</a>
+            <button onClick={handleLoginRedirect} className="block w-full bg-white text-black font-bold text-center py-3.5 rounded-xl mb-6 hover:bg-gray-200 transition">Login</button>
             
             <div className="flex items-center gap-3 mb-6"><div className="h-[1px] bg-gray-800 flex-1"></div><span className="text-[10px] text-gray-500 uppercase tracking-widest">OR MAKE ONE TAP BOOKING</span><div className="h-[1px] bg-gray-800 flex-1"></div></div>
             <div className="grid grid-cols-2 gap-4 mb-6">
@@ -586,7 +562,7 @@ export default function Home() {
 }
 
 function BookingContent() {
-  const params = useCustomSearchParams();
+  const params = useSearchParams();
   const hasBookingData = params && params.has('pickup') && params.has('dropoff');
   return <>{hasBookingData ? <BookingSummary /> : <MainBookingForm />}</>;
 }
