@@ -3,8 +3,9 @@ import Stripe from "stripe";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20", 
+  apiVersion: "2024-06-20" as any, 
 });
 
 export async function POST(req: Request) {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { price, bookingId } = body;
 
-    // পেমেন্ট সেশন তৈরি করা
+    
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
               name: "Taxi Booking Payment",
               description: `Booking Ref: ${bookingId}`,
             },
-            unit_amount: Math.round(parseFloat(price) * 100), // Stripe takes amount in pence/cents
+            unit_amount: Math.round(parseFloat(price) * 100), 
           },
           quantity: 1,
         },
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXTAUTH_URL}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/?payment=cancelled`,
       metadata: {
-        bookingId: bookingId,
+        bookingId: bookingId.toString(),
         userEmail: session.user.email,
       },
     });
