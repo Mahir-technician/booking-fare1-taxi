@@ -520,4 +520,4 @@ function BookingContent() {
   const params = useSearchParams();
   const hasBookingData = params && params.has('pickup') && params.has('dropoff');
   return <>{hasBookingData ? <BookingSummary /> : <MainBookingForm />}</>;
-}
+} 
