@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import toast, { Toaster } from 'react-hot-toast';
 
 // --- Types ---
 type LngLat = [number, number];
@@ -94,6 +96,7 @@ const MainBookingForm = () => {
   const routeWaypoints = useRef<{ pickup: LngLat | null, dropoff: LngLat | null, stops: (LngLat | null)[] }>({ pickup: null, dropoff: null, stops: [] });
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const mainSheetRef = useRef<HTMLDivElement>(null);
+  const vehicleContainerRef = useRef<HTMLDivElement>(null);
 
   // Initialize
   useEffect(() => {
@@ -190,7 +193,7 @@ const MainBookingForm = () => {
     setPickupSuggestions([]);
     setDropoffSuggestions([]);
     setStopSuggestions({});
-    if (window.innerWidth < 768) {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setSheetExpanded(true);
       if (mainSheetRef.current) mainSheetRef.current.scrollTo(0, 0);
     }
@@ -277,6 +280,7 @@ const MainBookingForm = () => {
 
   return (
     <div className="bg-primary-black text-gray-200 font-sans min-h-screen flex flex-col overflow-hidden">
+      <Toaster position="top-center" />
       
       {/* HEADER */}
       <header id="site-header" className="fixed z-50 w-full top-0">
@@ -374,11 +378,14 @@ const MainBookingForm = () => {
 };
 
 // ==========================================
-// 2. BOOKING SUMMARY COMPONENT
+// 2. BOOKING SUMMARY COMPONENT (Popup & Payment)
 // ==========================================
 const BookingSummary = () => {
   const params = useSearchParams();
+  const router = useRouter();
+  const { data: session } = useSession(); // সেশন চেক
   const [showPopup, setShowPopup] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
   const pickup = params?.get('pickup') || '';
   const dropoff = params?.get('dropoff') || '';
@@ -388,6 +395,35 @@ const BookingSummary = () => {
   const time = params?.get('time') || '';
   
   const isComplete = pickup && dropoff && vehicle && price;
+
+  const handleBookOrder = async () => {
+    setIsBooking(true);
+    try {
+      const res = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickup, dropoff, vehicle, price, date, time,
+          flight: params?.get('flight') || '',
+          meet: params?.get('meet') === 'true',
+          pax: params?.get('pax') || '1',
+          bags: params?.get('bags') || '0',
+          stops: [] 
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Booking Successful! Redirecting...");
+        setTimeout(() => router.push('/dashboard'), 2000);
+      } else {
+        toast.error("Failed to create booking.");
+      }
+    } catch (err) {
+      toast.error("Something went wrong.");
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   if (!isComplete) {
     return (
@@ -400,6 +436,7 @@ const BookingSummary = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 font-sans">
+      <Toaster />
       <div className="max-w-2xl mx-auto bg-black border border-brand-gold/30 rounded-2xl p-6 shadow-2xl mt-10">
         <h1 className="text-2xl md:text-3xl font-bold text-brand-gold text-center mb-8 border-b border-gray-800 pb-4">BOOKING SUMMARY</h1>
         
@@ -425,14 +462,42 @@ const BookingSummary = () => {
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
           <div className="bg-[#121212] w-full max-w-md rounded-2xl border border-brand-gold/40 p-6 relative shadow-2xl">
             <button onClick={() => setShowPopup(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition">✕</button>
-            <div className="text-center mb-6"><h2 className="text-xl font-bold text-white mb-2">Login Required</h2><p className="text-xs text-gray-400">Please login before making the payment</p></div>
-            <Link href="/log-in" className="block w-full bg-white text-black font-bold text-center py-3.5 rounded-xl mb-6 hover:bg-gray-200 transition">Login</Link>
-            <div className="flex items-center gap-3 mb-6"><div className="h-[1px] bg-gray-800 flex-1"></div><span className="text-[10px] text-gray-500 uppercase tracking-widest">OR MAKE ONE TAP BOOKING</span><div className="h-[1px] bg-gray-800 flex-1"></div></div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <a href={`https://wa.me/442381112682?text=${encodeURIComponent(`New Booking:\nFrom: ${pickup}\nTo: ${dropoff}\nCar: ${vehicle}\nPrice: £${price}\nTime: ${date} ${time}`)}`} target="_blank" className="flex flex-col items-center justify-center bg-[#25D366] hover:bg-[#1da851] text-white py-3 rounded-xl transition"><span className="font-bold text-sm">WhatsApp</span></a>
-              <a href={`mailto:booking@fare1.co.uk?subject=New Booking Request&body=${encodeURIComponent(`Pickup: ${pickup}\nDropoff: ${dropoff}\nVehicle: ${vehicle}\nPrice: £${price}\nDate: ${date} ${time}`)}`} className="flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl transition"><span className="font-bold text-sm">Email</span></a>
-            </div>
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3"><p className="text-[10px] text-red-400 text-center leading-relaxed">Note: If you choose WhatsApp or Email, online payment won’t be available. Payment must be made in the cab.</p></div>
+
+            {session ? (
+              // --- LOGGED IN VIEW ---
+              <div className="text-center">
+                 <h2 className="text-xl font-bold text-brand-gold mb-4">Complete Your Booking</h2>
+                 <p className="text-gray-400 text-sm mb-6">Choose how you want to pay</p>
+                 
+                 <button 
+                   onClick={handleBookOrder} 
+                   disabled={isBooking}
+                   className="block w-full bg-brand-gold text-black font-bold text-center py-3.5 rounded-xl mb-4 hover:bg-yellow-600 transition"
+                 >
+                   {isBooking ? "Processing..." : "Confirm & Pay in Cab"}
+                 </button>
+                 
+                 <button className="block w-full bg-gray-800 text-gray-500 font-bold text-center py-3.5 rounded-xl mb-6 cursor-not-allowed">
+                   Pay Online (Coming Soon)
+                 </button>
+              </div>
+            ) : (
+              // --- GUEST VIEW ---
+              <>
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-bold text-white mb-2">Login Required</h2>
+                  <p className="text-xs text-gray-400">Please login before making the payment</p>
+                </div>
+                <Link href={`/log-in?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`} className="block w-full bg-white text-black font-bold text-center py-3.5 rounded-xl mb-6 hover:bg-gray-200 transition">Login</Link>
+                <div className="flex items-center gap-3 mb-6"><div className="h-[1px] bg-gray-800 flex-1"></div><span className="text-[10px] text-gray-500 uppercase tracking-widest">OR MAKE ONE TAP BOOKING</span><div className="h-[1px] bg-gray-800 flex-1"></div></div>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <a href={`https://wa.me/442381112682?text=${encodeURIComponent(`New Booking:\nFrom: ${pickup}\nTo: ${dropoff}\nCar: ${vehicle}\nPrice: £${price}\nTime: ${date} ${time}`)}`} target="_blank" className="flex flex-col items-center justify-center bg-[#25D366] hover:bg-[#1da851] text-white py-3 rounded-xl transition"><span className="font-bold text-sm">WhatsApp</span></a>
+                  <a href={`mailto:booking@fare1.co.uk?subject=New Booking Request&body=${encodeURIComponent(`Pickup: ${pickup}\nDropoff: ${dropoff}\nVehicle: ${vehicle}\nPrice: £${price}\nDate: ${date} ${time}`)}`} className="flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl transition"><span className="font-bold text-sm">Email</span></a>
+                </div>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3"><p className="text-[10px] text-red-400 text-center leading-relaxed">Note: If you choose WhatsApp or Email, online payment won’t be available. Payment must be made in the cab.</p></div>
+              </>
+            )}
+
           </div>
         </div>
       )}
