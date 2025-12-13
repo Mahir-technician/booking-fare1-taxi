@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function SignUp() {
-  // const router = useRouter(); // Preview environment e Next.js router kaj korbe na, tai window location use korchi
+  const router = useRouter();
   const [data, setData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,16 +22,18 @@ export default function SignUp() {
         body: JSON.stringify(data),
       });
 
+      const responseData = await res.json(); // সার্ভার থেকে JSON রেসপন্স নেওয়া
+
       if (res.ok) {
-          // router.push('/log-in'); // Removed for preview compatibility
-          window.location.href = '/log-in'; // Standard browser redirect
+          // সফল হলে লগইন পেজে রিডাইরেক্ট
+          window.location.href = '/log-in';
       } else {
-          const msg = await res.text();
-          setError('Registration failed. This email might already be in use.');
+          // সার্ভার থেকে আসা সঠিক এরর মেসেজ দেখানো
+          setError(responseData.message || 'Registration failed. Please try again.');
           setLoading(false);
       }
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      setError('Network error. Check your connection.');
       setLoading(false);
     }
   };
@@ -98,10 +102,9 @@ export default function SignUp() {
         <div className="mt-8 text-center border-t border-gray-800 pt-6">
           <p className="text-gray-500 text-sm">
             Already have an account?{' '}
-            {/* Link component removed for preview compatibility */}
-            <a href="/log-in" className="text-brand-gold hover:text-white font-semibold transition-colors ml-1">
+            <Link href="/log-in" className="text-brand-gold hover:text-white font-semibold transition-colors ml-1">
               Log In
-            </a>
+            </Link>
           </p>
         </div>
       </div>
