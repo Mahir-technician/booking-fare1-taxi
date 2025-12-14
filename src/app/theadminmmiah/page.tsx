@@ -19,8 +19,11 @@ export default function SecretAdminPanel() {
       router.push('/theadminmmiah/login'); 
     } else if (status === 'authenticated') {
       if (!ALLOWED_ADMINS.includes(session?.user?.email || '')) {
-        toast.error("Unauthorized Access!");
-        setTimeout(() => router.push('/'), 2000);
+        toast.error("Unauthorized Access! Redirecting...");
+        
+        setTimeout(() => {
+            window.location.href = 'https://fare1.co.uk';
+        }, 2000);
       } else {
         fetchOrders();
       }
@@ -80,6 +83,11 @@ export default function SecretAdminPanel() {
   };
 
   if (status === 'loading' || loading) return <div className="min-h-screen bg-black text-brand-gold flex items-center justify-center">Verifying Admin Access...</div>;
+
+  
+  if (!ALLOWED_ADMINS.includes(session?.user?.email || '')) {
+      return <div className="min-h-screen bg-black text-red-500 flex items-center justify-center">Access Denied. Redirecting...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
