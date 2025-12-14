@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
-    
     const session = await getServerSession(authOptions) as any;
 
     if (!session || !session.user?.email) {
@@ -41,7 +40,8 @@ export async function POST(req: Request) {
         meet: meet || false,
         pax: parseInt(pax),
         bags: parseInt(bags),
-        stops: stops || [],
+        // Fix for SQLite: Convert array to string
+        stops: JSON.stringify(stops || []), 
         status: "pending",
         paymentId: "pay_in_cab",
       },
