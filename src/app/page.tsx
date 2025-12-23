@@ -712,19 +712,19 @@ const BookingSummary = () => {
                                 <p className="text-[10px] text-center text-gray-500 uppercase tracking-widest mb-3">Or Pay Securely Online</p>
                                 <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", currency: "GBP" }}>
                                     <PayPalButtons 
-                                        style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
-                                        createOrder={async (data, actions) => {
-                                            return actions.order.create({
-                                                intent: "CAPTURE",
-                                                purchase_units: [{ amount: { currency_code: "GBP", value: data.price } }]
-                                            });
-                                        }}
-                                        onApprove={async (data, actions) => {
-                                            await actions.order.capture();
-                                            toast.success("Payment Successful");
-                                            handleBookOrder();
-                                        }}
-                                    />
+    style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
+    createOrder={async (paypalData, actions) => {
+        return actions.order.create({
+            intent: "CAPTURE",
+            purchase_units: [{ amount: { currency_code: "GBP", value: data.price } }]
+        });
+    }}
+    onApprove={async (paypalData, actions) => {
+        await actions.order.capture();
+        toast.success("Payment Successful");
+        handleBookOrder();
+    }}
+/>
                                 </PayPalScriptProvider>
                             </div>
                         </>
