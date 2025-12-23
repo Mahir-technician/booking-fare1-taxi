@@ -720,10 +720,14 @@ const BookingSummary = () => {
         });
     }}
     onApprove={async (paypalData, actions) => {
+    if (actions.order) {
         await actions.order.capture();
         toast.success("Payment Successful");
         handleBookOrder();
-    }}
+    } else {
+        toast.error("Payment failed: Order not found.");
+    }
+}}
 />
                                 </PayPalScriptProvider>
                             </div>
